@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>就業規則見直し・労務課題解決 ダッシュボード | 新橋ベーカリー様</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* <!-- Chosen Palette: Trust Blue & Bakery Warmth -->
+           Base: #f8fafc (slate-50), Primary: #0f172a (slate-900), Secondary: #334155 (slate-700)
+           Accent (Action): #ea580c (orange-600), Accent (Success): #16a34a (green-600)
+        */
+
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* タブのトランジション */
+        .tab-content { display: none; opacity: 0; transition: opacity 0.3s ease-in-out; }
+        .tab-content.active { display: block; opacity: 1; }
+
+        /* チャートコンテナの必須スタイリング */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 250px;
+            max-height: 300px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 300px; }
+        }
+
+        /* カスタムチェックボックス */
+        .task-checkbox:checked + div {
+            background-color: #16a34a;
+            border-color: #16a34a;
+        }
+        .task-checkbox:checked + div svg {
+            display: block;
+        }
+    </style>
+    <!-- Application Structure Plan: 
+         本SPAは、社労士とクライアント（新橋ベーカリー様）間のプロジェクト管理ダッシュボードとして機能します。
+         議事録の単なる羅列ではなく、「次に誰が何をするべきか（TODO）」と「全体のスケジュール感」を直感的に把握できる構造に設計しました。
+         上部にはプロジェクト全体の進捗を視覚化するサマリーとドーナツチャートを配置。
+         下部はタブ構造（TODOリスト、スケジュール、助成金情報）とし、目的の情報にすばやくアクセスできるようにしています。
+         双方向のTODO確認と、チェックボックス操作によるリアルタイムな進捗フィードバックにより、プロジェクト推進を促進します。
+    -->
+    <!-- Visualization & Content Choices: 
+         1. 全体進捗 (Goal: Inform/Engage) -> Chart.jsのドーナツチャート。TODOの消化率をリアルタイムに反映し、達成感を演出。
+         2. TODOリスト (Goal: Organize/Action) -> カスタムHTMLリストとJS。担当者（社労士/顧客）をバッジで明確化し、アコーディオンで詳細な背景（議事録内容に基づく）を表示。
+         3. スケジュール (Goal: Change/Timeline) -> Tailwind CSSによる垂直タイムライン。マイルストーンと期限を視覚的に整理。
+         4. 助成金サマリー (Goal: Inform) -> グリッドカードレイアウト。検討中の助成金とそのステータスを一覧化。
+         ※ SVGグラフィックおよびMermaid JSは使用していません。アイコン等はTailwind/HTMLで構成しています。
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used (except inline SVG for UI icons). NO Mermaid JS used. -->
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold tracking-tight">労務プロジェクト ダッシュボード</h1>
+                <p class="text-sm text-slate-300 mt-1">新橋ベーカリー様 × 社会保険労務士</p>
+            </div>
+            <div class="hidden md:flex items-center space-x-2 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-sm font-medium text-slate-200">プロジェクト進行中</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        
+        <!-- Dashboard Top: Summary & Progress -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            
+            <!-- Summary Card -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h2 class="text-xl font-bold text-slate-900 mb-4 flex items-center">
+                    <span class="mr-2">📋</span> ミーティング決定事項サマリー
+                </h2>
+                <p class="text-slate-600 mb-4 text-sm leading-relaxed">
+                    先日のミーティングに基づき、現在の古い就業規則を現代の法令と実情に合わせて全面的に見直します。主な取り組み課題は以下の3点です。
+                </p>
+                <div class="space-y-4">
+                    <div class="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                        <h3 class="font-bold text-orange-800 mb-1">1. 労働時間と休日の不公平感是正</h3>
+                        <p class="text-sm text-orange-700">製造部門（シフト制）と店舗部門（土日祝休み）の休日数の違いによる給与バランスを是正するため、基本給は維持しつつ<strong>「調整手当」</strong>を新設する方向で制度設計を行います。</p>
+                    </div>
+                    <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                        <h3 class="font-bold text-blue-800 mb-1">2. 退職金制度の現代化</h3>
+                        <p class="text-sm text-blue-700">実態に合わなくなった古い退職金規定を整理し、税制優遇のメリットが大きい<strong>「企業型確定拠出年金（企業型DC）」</strong>への移行を進めます。</p>
+                    </div>
+                    <div class="p-4 bg-green-50 rounded-lg border border-green-100">
+                        <h3 class="font-bold text-green-800 mb-1">3. 外国人雇用と多様な働き方対応</h3>
+                        <p class="text-sm text-green-700">外国人従業員向けの長期休暇制度の整備（助成金活用視野）、技人国ビザのコンプライアンス遵守、および育児・介護休業規定の最新法改正への対応を行います。</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Chart Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col justify-center items-center">
+                <h2 class="text-lg font-bold text-slate-900 mb-2">プロジェクト進捗</h2>
+                <p class="text-sm text-slate-500 mb-4">TODOリストの消化状況</p>
+                
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+                
+                <div class="mt-4 text-center">
+                    <span class="text-3xl font-extrabold text-slate-800" id="progressPercentage">0%</span>
+                    <p class="text-xs text-slate-500 mt-1" id="progressText">0 / 0 タスク完了</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="border-b border-slate-200 mb-6">
+            <nav class="flex space-x-8" aria-label="Tabs">
+                <button onclick="openTab('tasks')" id="tab-btn-tasks" class="border-orange-500 text-orange-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    TODOリスト (タスク)
+                </button>
+                <button onclick="openTab('schedule')" id="tab-btn-schedule" class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    今後のスケジュール
+                </button>
+                <button onclick="openTab('grants')" id="tab-btn-grants" class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                    活用検討中の助成金
+                </button>
+            </nav>
+        </div>
+
+        <!-- Tab Content: Tasks -->
+        <div id="tab-tasks" class="tab-content active">
+            <div class="mb-4">
+                <p class="text-slate-600">ミーティング内容に基づく、双方の今後の作業リストです。完了した項目にチェックを入れてください。</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Client Tasks -->
+                <div>
+                    <div class="flex items-center justify-between border-b-2 border-slate-800 pb-2 mb-4">
+                        <h3 class="text-lg font-bold text-slate-800">新橋ベーカリー様のTODO</h3>
+                        <span class="bg-slate-800 text-white text-xs font-bold px-2 py-1 rounded">お客様作業</span>
+                    </div>
+                    <div id="clientTaskList" class="space-y-3">
+                        <!-- JSによって生成されます -->
+                    </div>
+                </div>
+
+                <!-- Consultant Tasks -->
+                <div>
+                    <div class="flex items-center justify-between border-b-2 border-orange-600 pb-2 mb-4">
+                        <h3 class="text-lg font-bold text-orange-800">社労士のTODO</h3>
+                        <span class="bg-orange-100 text-orange-800 border border-orange-200 text-xs font-bold px-2 py-1 rounded">当事務所作業</span>
+                    </div>
+                    <div id="consultantTaskList" class="space-y-3">
+                        <!-- JSによって生成されます -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Schedule -->
+        <div id="tab-schedule" class="tab-content">
+            <div class="mb-6">
+                <p class="text-slate-600">就業規則の改定および企業型DC導入までの大まかなマイルストーンです。</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div class="relative border-l border-slate-200 ml-3 md:ml-6 space-y-8">
+                    
+                    <!-- Timeline Item 1 -->
+                    <div class="relative pl-6 md:pl-8">
+                        <div class="absolute w-4 h-4 bg-orange-500 rounded-full -left-[8.5px] top-1 border-4 border-white"></div>
+                        <div class="flex flex-col sm:flex-row sm:items-center mb-1">
+                            <h4 class="text-lg font-bold text-slate-900">Step 1: 現状分析と制度設計</h4>
+                            <span class="sm:ml-4 text-sm font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded">進行中 (今週〜来週)</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            お客様からの労働時間データ受領後、「調整手当」の金額シミュレーションを実施します。同時に、クラウドストレージの設定と共有を行います。
+                        </p>
+                    </div>
+
+                    <!-- Timeline Item 2 -->
+                    <div class="relative pl-6 md:pl-8">
+                        <div class="absolute w-4 h-4 bg-slate-300 rounded-full -left-[8.5px] top-1 border-4 border-white"></div>
+                        <div class="flex flex-col sm:flex-row sm:items-center mb-1">
+                            <h4 class="text-lg font-bold text-slate-900">Step 2: 就業規則等ドラフトの共有・検討</h4>
+                            <span class="sm:ml-4 text-sm font-medium text-slate-500">約2〜3週間後</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            本則、育児・介護休業規定、外国人向け一時休暇制度の規定案をクラウド上で共有します。内容をご確認いただき、修正を重ねます。
+                        </p>
+                    </div>
+
+                    <!-- Timeline Item 3 -->
+                    <div class="relative pl-6 md:pl-8">
+                        <div class="absolute w-4 h-4 bg-slate-300 rounded-full -left-[8.5px] top-1 border-4 border-white"></div>
+                        <div class="flex flex-col sm:flex-row sm:items-center mb-1">
+                            <h4 class="text-lg font-bold text-slate-900">Step 3: 企業型DC移行準備・従業員説明会</h4>
+                            <span class="sm:ml-4 text-sm font-medium text-slate-500">約1ヶ月後</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            既存の退職金対象者への説明と同意取得の準備を行います。制度変更について従業員様向けの説明会（または書面配布）を実施します。
+                        </p>
+                    </div>
+
+                    <!-- Timeline Item 4 -->
+                    <div class="relative pl-6 md:pl-8">
+                        <div class="absolute w-4 h-4 bg-slate-300 rounded-full -left-[8.5px] top-1 border-4 border-white"></div>
+                        <div class="flex flex-col sm:flex-row sm:items-center mb-1">
+                            <h4 class="text-lg font-bold text-slate-900">Step 4: 労基署への届出・助成金申請</h4>
+                            <span class="sm:ml-4 text-sm font-medium text-slate-500">約1.5ヶ月後〜</span>
+                        </div>
+                        <p class="text-sm text-slate-600">
+                            確定した就業規則を労働基準監督署へ届け出ます。要件を満たしたタイミングで、該当する助成金の支給申請手続きを行います。
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab Content: Grants -->
+        <div id="tab-grants" class="tab-content">
+            <div class="mb-6">
+                <p class="text-slate-600">今回の就業規則見直しに伴い、要件を満たす可能性がある助成金です。</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Grant Card 1 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-bl-lg">要件確認中</div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center">
+                        <span class="text-2xl mr-2">👶</span> 両立支援等助成金
+                    </h3>
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3 border-b pb-2">（育休休業等支援コース / 出生時両立支援コース 等）</h4>
+                    <p class="text-sm text-slate-600 mb-4">
+                        育児・介護休業規定を最新の法令に合わせて改定し、実際に男性の育休取得や、育休復帰支援のプランを作成・実施した場合に申請できる可能性があります。
+                    </p>
+                    <div class="bg-slate-50 p-3 rounded text-sm">
+                        <span class="font-bold text-slate-700">アクション:</span> 規定改定案の作成後、対象となりそうな従業員様がいらっしゃるかヒアリングを実施します。
+                    </div>
+                </div>
+
+                <!-- Grant Card 2 -->
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-bl-lg">要件確認中</div>
+                    <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center">
+                        <span class="text-2xl mr-2">✈️</span> 働き方改革推進支援助成金
+                    </h3>
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3 border-b pb-2">（労働時間短縮・年休促進支援コース 等）</h4>
+                    <p class="text-sm text-slate-600 mb-4">
+                        外国人従業員等のために「特別な休暇制度（一時帰国休暇など）」を就業規則に新たに規定し、実際に付与した場合に助成対象となるコースが存在します。
+                    </p>
+                    <div class="bg-slate-50 p-3 rounded text-sm">
+                        <span class="font-bold text-slate-700">アクション:</span> 手当の新設や特別休暇制度の導入が、本年度の助成金要件に合致するか最新の情報を当事務所で精査します。
+                    </div>
+                </div>
+
+                <!-- Grant Card 3 (Other) -->
+                <div class="bg-slate-100 rounded-xl border border-slate-200 p-6 md:col-span-2 text-center">
+                    <p class="text-sm text-slate-600">
+                        ※助成金は予算措置や法改正により要件が頻繁に変更されます。確実な受給をお約束するものではなく、現時点での「活用可能性」としてのリストアップとなります。
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex justify-between items-center text-sm text-slate-500">
+            <p>機密情報を含みます。取り扱いにはご注意ください。</p>
+            <p>&copy; 社会保険労務士事務所</p>
+        </div>
+    </footer>
+
+    <script>
+        /**
+         * 状態管理とデータ
+         */
+        const state = {
+            tasks: [
+                // 顧客TODO
+                { id: 'c1', owner: 'client', title: '部門別（店舗/製造）の直近の労働時間・休日実績データの共有', completed: false, detail: '「調整手当」の適切な金額をシミュレーションするため、従業員ごとの実働日数・時間のデータをご用意ください。' },
+                { id: 'c2', owner: 'client', title: '既存の退職金対象者のリストアップ', completed: false, detail: '企業型DCへの移行に向けて、現在の退職金規定の対象となっている従業員のリストを作成してください。' },
+                { id: 'c3', owner: 'client', title: '外国人従業員の在留資格（ビザ）状況の共有', completed: false, detail: '技人国ビザなどのコンプライアンス確認のため、現在のビザの種類と有効期限のリストをご共有ください。' },
+                { id: 'c4', owner: 'client', title: 'クラウドストレージ（共有フォルダ）へのアクセス確認', completed: false, detail: '当事務所から招待メールをお送りします。アクセス可能かご確認ください。' },
+                
+                // 社労士TODO
+                { id: 's1', owner: 'consultant', title: '共有用クラウドストレージのセットアップと招待送信', completed: true, detail: '今後のドラフトファイル等を共有するためのセキュアなフォルダを準備し、ご案内します。' },
+                { id: 's2', owner: 'consultant', title: '就業規則（本則）ドラフト作成：調整手当の反映', completed: false, detail: '店舗と製造の休日数の差異を埋める「調整手当」の規定を条文に落とし込みます。' },
+                { id: 's3', owner: 'consultant', title: '退職金規定の廃止および企業型DC導入規定の作成', completed: false, detail: '古い制度を廃止し、新しい年金制度へ移行するための法的な枠組みを規定します。' },
+                { id: 's4', owner: 'consultant', title: '育児・介護休業規定の改定案作成', completed: false, detail: '最新の法改正（産後パパ育休等）に対応した規定にアップデートします。' },
+                { id: 's5', owner: 'consultant', title: '外国人従業員向け一時休暇制度のドラフト作成', completed: false, detail: '助成金の活用も視野に入れ、母国帰国等のための特別休暇制度を設計します。' },
+                { id: 's6', owner: 'consultant', title: '関連助成金の最新要件確認とシミュレーション', completed: false, detail: '提案した助成金が現在の要件で受給可能か詳細を確認し、レポートします。' },
+            ]
+        };
+
+        let progressChartInstance = null;
+
+        /**
+         * UIレンダリングロジック
+         */
+        function renderTasks() {
+            const clientContainer = document.getElementById('clientTaskList');
+            const consultantContainer = document.getElementById('consultantTaskList');
+            
+            clientContainer.innerHTML = '';
+            consultantContainer.innerHTML = '';
+
+            state.tasks.forEach(task => {
+                const taskHTML = `
+                    <div class="bg-white border ${task.completed ? 'border-green-200 bg-green-50/30' : 'border-slate-200 hover:border-slate-300'} rounded-lg p-4 transition-colors">
+                        <label class="flex items-start cursor-pointer group">
+                            <div class="relative flex items-center justify-center mt-1 mr-3">
+                                <input type="checkbox" class="task-checkbox sr-only" ${task.completed ? 'checked' : ''} onchange="toggleTask('${task.id}')">
+                                <div class="w-5 h-5 border-2 border-slate-300 rounded bg-white group-hover:border-slate-400 transition-colors flex items-center justify-center">
+                                    <svg class="w-3 h-3 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                </div>
+                            </div>
+                            <div class="flex-1">
+                                <span class="block text-sm font-medium ${task.completed ? 'text-slate-400 line-through' : 'text-slate-800'} transition-all">${task.title}</span>
+                                <p class="text-xs text-slate-500 mt-1 mt-2 pl-2 border-l-2 border-slate-100">${task.detail}</p>
+                            </div>
+                        </label>
+                    </div>
+                `;
+
+                if (task.owner === 'client') {
+                    clientContainer.innerHTML += taskHTML;
+                } else {
+                    consultantContainer.innerHTML += taskHTML;
+                }
+            });
+
+            updateChart();
+        }
+
+        /**
+         * インタラクションハンドラ
+         */
+        window.toggleTask = function(taskId) {
+            const task = state.tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                renderTasks(); // 再レンダリングして状態とチャートを更新
+            }
+        };
+
+        window.openTab = function(tabName) {
+            // タブコンテンツの切り替え
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            // タブボタンのスタイリング切り替え
+            document.querySelectorAll('nav button').forEach(btn => {
+                btn.classList.remove('border-orange-500', 'text-orange-600');
+                btn.classList.add('border-transparent', 'text-slate-500');
+            });
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.classList.remove('border-transparent', 'text-slate-500');
+            activeBtn.classList.add('border-orange-500', 'text-orange-600');
+        };
+
+        /**
+         * Chart.js 関連ロジック
+         */
+        function updateChart() {
+            const totalTasks = state.tasks.length;
+            const completedTasks = state.tasks.filter(t => t.completed).length;
+            const remainingTasks = totalTasks - completedTasks;
+            
+            const percentage = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+            // テキストの更新
+            document.getElementById('progressPercentage').innerText = `${percentage}%`;
+            document.getElementById('progressText').innerText = `${completedTasks} / ${totalTasks} タスク完了`;
+
+            const chartData = {
+                labels: ['完了', '未完了'],
+                datasets: [{
+                    data: [completedTasks, remainingTasks],
+                    backgroundColor: [
+                        '#16a34a', // green-600
+                        '#f1f5f9'  // slate-100
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            };
+
+            const ctx = document.getElementById('progressChart').getContext('2d');
+
+            if (progressChartInstance) {
+                progressChartInstance.data = chartData;
+                progressChartInstance.update();
+            } else {
+                progressChartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, // コンテナのサイズに従う
+                        cutout: '75%', // ドーナツの太さ
+                        plugins: {
+                            legend: {
+                                display: false // 凡例は隠す（UIで表示しているため）
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed !== null) {
+                                            label += context.parsed + ' タスク';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        animation: {
+                            animateScale: true,
+                            animateRotate: true
+                        }
+                    }
+                });
+            }
+        }
+
+        // 初期化処理
+        document.addEventListener('DOMContentLoaded', () => {
+            renderTasks();
+        });
+
+    </script>
+</body>
+</html>
